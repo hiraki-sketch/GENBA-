@@ -1,54 +1,78 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 import type { Shift, User, WorkScheduleEntry } from "../../types";
+import {
+  fetchMyWorkSchedules,
+  upsertMyWorkSchedule,
+} from "../api/workschedules";
 
 export function useWorkScheduleManagement(user: User, selectedShift: Shift) {
+  const queryClient = useQueryClient();
+
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
-  const scheduleEntries = useMemo<WorkScheduleEntry[]>(
-    () => [
-      {
-        id: "1",
+  const schedulesQuery = useQuery({
+    queryKey: ["workSchedules", user.id],
+    enabled: Boolean(user.id),
+    queryFn: () => fetchMyWorkSchedules(user.id),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: upsertMyWorkSchedule,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workSchedules", user.id] });
+    },
+  });
+
+  const formatDateForComparison = useCallback((date: Date) => {
+    return date.toISOString().split("T")[0];
+  }, []);
+
+  const allScheduleEntries = useMemo<WorkScheduleEntry[]>(() => {
+    return (schedulesQuery.data ?? []).map((item) => ({
+      id: item.id,
+      userId: item.userId,
+      date: item.workDate,
+      shift: item.shift as Shift,
+      memo: item.memo,
+      startTime: "",
+      endTime: "",
+      department: user.department,
+      status: "scheduled",
+    }));
+  }, [schedulesQuery.data, user.department]);
+
+  const filteredScheduleEntries = useMemo(
+    () => allScheduleEntries.filter((entry) => entry.shift === selectedShift),
+    [allScheduleEntries, selectedShift]
+  );
+
+  const getScheduleForDate = useCallback(
+    (date: Date) => {
+      const dateStr = formatDateForComparison(date);
+      return filteredScheduleEntries.find((entry) => entry.date === dateStr);
+    },
+    [filteredScheduleEntries, formatDateForComparison]
+  );
+
+  const handleSelectDate = useCallback(
+    async (date: Date, shiftOverride?: string | null, memo?: string | null) => {
+      setSelectedDate(date);
+
+      const dateStr = formatDateForComparison(date);
+
+      const shiftToSave =
+        shiftOverride && shiftOverride.trim().length > 0 ? shiftOverride : selectedShift;
+
+      await createMutation.mutateAsync({
         userId: user.id,
-        date: "2024-12-20",
-        shift: "1勤",
-        startTime: "08:00",
-        endTime: "16:00",
-        department: user.department,
-        status: "confirmed",
-      },
-      {
-        id: "2",
-        userId: user.id,
-        date: "2024-12-21",
-        shift: "2勤",
-        startTime: "16:00",
-        endTime: "00:00",
-        department: user.department,
-        status: "scheduled",
-      },
-      {
-        id: "3",
-        userId: user.id,
-        date: "2024-12-22",
-        shift: "1勤",
-        startTime: "08:00",
-        endTime: "16:00",
-        department: user.department,
-        status: "scheduled",
-      },
-      {
-        id: "4",
-        userId: user.id,
-        date: "2024-12-23",
-        shift: "3勤",
-        startTime: "00:00",
-        endTime: "08:00",
-        department: user.department,
-        status: "scheduled",
-      },
-    ],
-    [user.department, user.id]
+        workDate: dateStr,
+        shift: shiftToSave,
+        memo: memo ?? null,
+      });
+    },
+    [createMutation, formatDateForComparison, selectedShift, user.id]
   );
 
   const getShiftColor = useCallback((shift: Shift) => {
@@ -103,10 +127,6 @@ export function useWorkScheduleManagement(user: User, selectedShift: Shift) {
     }
   }, []);
 
-  const formatDateForComparison = useCallback((date: Date) => {
-    return date.toISOString().split("T")[0];
-  }, []);
-
   const getDaysInMonth = useCallback((date: Date): Date[] => {
     const year = date.getFullYear();
     const month = date.getMonth();
@@ -116,10 +136,12 @@ export function useWorkScheduleManagement(user: User, selectedShift: Shift) {
 
     const days: Date[] = [];
     const current = new Date(startDate);
+
     for (let i = 0; i < 42; i++) {
       days.push(new Date(current));
       current.setDate(current.getDate() + 1);
     }
+
     return days;
   }, []);
 
@@ -135,24 +157,29 @@ export function useWorkScheduleManagement(user: User, selectedShift: Shift) {
     );
   }, []);
 
-  const filteredScheduleEntries = useMemo(
-    () => scheduleEntries.filter((entry) => entry.shift === selectedShift),
-    [scheduleEntries, selectedShift]
+  const days = useMemo(
+    () => getDaysInMonth(currentMonth),
+    [currentMonth, getDaysInMonth]
   );
 
-  const getScheduleForDate = useCallback(
-    (date: Date) => {
-      const dateStr = formatDateForComparison(date);
-      return filteredScheduleEntries.find((entry) => entry.date === dateStr);
-    },
-    [filteredScheduleEntries, formatDateForComparison]
-  );
-
-  const days = useMemo(() => getDaysInMonth(currentMonth), [currentMonth, getDaysInMonth]);
   const monthNames = useMemo(
-    () => ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"],
+    () => [
+      "1月",
+      "2月",
+      "3月",
+      "4月",
+      "5月",
+      "6月",
+      "7月",
+      "8月",
+      "9月",
+      "10月",
+      "11月",
+      "12月",
+    ],
     []
   );
+
   const dayNames = useMemo(() => ["日", "月", "火", "水", "木", "金", "土"], []);
 
   return {
@@ -161,7 +188,10 @@ export function useWorkScheduleManagement(user: User, selectedShift: Shift) {
       currentMonth,
     },
     data: {
-      scheduleEntries: filteredScheduleEntries,
+      /** カレンダー表示用（全勤務帯） */
+      scheduleEntries: allScheduleEntries,
+      /** グローバル勤務帯フィルタ適用後 */
+      filteredScheduleEntries,
       days,
       monthNames,
       dayNames,
@@ -178,7 +208,14 @@ export function useWorkScheduleManagement(user: User, selectedShift: Shift) {
       setSelectedDate,
       previousMonth,
       nextMonth,
+      handleSelectDate,
+    },
+    query: {
+      isPending: schedulesQuery.isPending,
+      isError: schedulesQuery.isError,
+      error: schedulesQuery.error,
+      refetch: schedulesQuery.refetch,
+      isSaving: createMutation.isPending,
     },
   };
 }
-

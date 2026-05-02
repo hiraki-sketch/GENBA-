@@ -15,7 +15,7 @@ export type ShiftData = {
 };
 
 type Employee = {
-  id: number;
+  id: string;
   name: string;
   schedule: Record<number, ShiftData>;
 };

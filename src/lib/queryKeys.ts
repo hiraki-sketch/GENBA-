@@ -9,10 +9,14 @@ export const queryKeys = {
     all: ["incidentReports"] as const,
     list: (userId: string, departmentId: string | null) =>
       [...queryKeys.incidentReports.all, "list", userId, departmentId ?? ""] as const,
+    search: (departmentId: string, keyword: string) =>
+      [...queryKeys.incidentReports.all, "search", departmentId, keyword] as const,
   },
   departmentAnnouncements: {
     all: ["departmentAnnouncements"] as const,
     list: (userId: string, departmentId: string | null) =>
       [...queryKeys.departmentAnnouncements.all, "list", userId, departmentId ?? ""] as const,
+    search: (departmentId: string, keyword: string) =>
+      [...queryKeys.departmentAnnouncements.all, "search", departmentId, keyword] as const,
   },
 } as const;

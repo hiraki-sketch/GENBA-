@@ -77,6 +77,8 @@ export interface WorkScheduleEntry {
   userId: string;
   date: string;
   shift: Shift;
+  /** DB `work_schedules.memo`（勤務場所など） */
+  memo?: string | null;
   startTime: string;
   endTime: string;
   department: string;

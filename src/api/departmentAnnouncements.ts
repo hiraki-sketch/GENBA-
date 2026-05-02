@@ -145,3 +145,60 @@ export async function deleteDepartmentAnnouncement(
     throw new Error(deleteError.message);
   }
 }
+/** PostgREST `or` 用に、ワイルドカードや区切り文字を弱体化した検索トークン */
+function sanitizeAnnouncementSearchToken(keyword: string): string {
+  return keyword
+    .trim()
+    .replace(/[%_,]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * 部署内の部署連絡を、タイトルまたは本文の部分一致（大文字小文字区別なし）で検索する。
+ * 論理削除済みは除外。著者名は別クエリで解決する。
+ */
+export async function searchDepartmentAnnouncements(
+  departmentId: string | null,
+  keyword: string
+): Promise<DepartmentAnnouncement[]> {
+  if (!departmentId) return [];
+
+  const token = sanitizeAnnouncementSearchToken(keyword);
+  if (!token) return [];
+
+  const pattern = `%${token}%`;
+
+  const { data, error } = await supabase
+    .from("department_announcements")
+    .select("id, title, body, created_by, created_at, is_pinned")
+    .is("deleted_at", null)
+    .eq("department_id", departmentId)
+    .or(`title.ilike.${pattern},body.ilike.${pattern}`)
+    .order("is_pinned", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (error) throw new Error(error.message);
+
+  const rows = (data as AnnouncementRow[] | null) ?? [];
+  const authorIds = Array.from(
+    new Set(rows.map((row) => row.created_by).filter((id): id is string => Boolean(id)))
+  );
+
+  const authorNameById: Record<string, string | null> = {};
+  if (authorIds.length > 0) {
+    const { data: profilesData, error: profilesError } = await supabase
+      .from("profiles")
+      .select("id, display_name")
+      .in("id", authorIds);
+
+    if (profilesError) throw new Error(profilesError.message);
+
+    for (const profile of profilesData ?? []) {
+      authorNameById[profile.id] = profile.display_name ?? null;
+    }
+  }
+
+  return rows.map((row) => mapRow(row, authorNameById));
+}

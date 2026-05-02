@@ -12,8 +12,8 @@ import { ShiftCell } from './ShiftCell';
 
 interface ScheduleCalendarProps {
   scheduleData: ScheduleData;
-  currentUserId: number;
-  onUpdateShift: (employeeId: number, day: number, shiftData: ShiftData) => void;
+  currentUserId: string;
+  onUpdateShift: (employeeId: string, day: number, shiftData: ShiftData) => void;
 }
 
 export function ScheduleCalendar({

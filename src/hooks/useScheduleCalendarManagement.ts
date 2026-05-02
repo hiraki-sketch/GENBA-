@@ -5,8 +5,8 @@ const EMPTY_SHIFT_DATA: ShiftData = { shift: '', workplace: '' };
 
 type UseScheduleCalendarManagementParams = {
   scheduleData: ScheduleData;
-  currentUserId: number;
-  onUpdateShift: (employeeId: number, day: number, shiftData: ShiftData) => void;
+  currentUserId: string;
+  onUpdateShift: (employeeId: string, day: number, shiftData: ShiftData) => void;
 };
 
 export function useScheduleCalendarManagement({

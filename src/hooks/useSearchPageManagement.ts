@@ -1,5 +1,13 @@
 import { useCallback, useMemo, useState } from "react";
 import type { Shift, User } from "../../types";
+import { useQuery } from "@tanstack/react-query";
+import {
+  searchDepartmentAnnouncements,
+  type DepartmentAnnouncement,
+} from "../api/departmentAnnouncements";
+import { searchIncidentReports } from "../api/incidentReports";
+import { queryKeys } from "../lib/queryKeys";
+
 
 export type SearchType = "all" | "incident" | "announcement";
 type SeverityFilter = "all" | "low" | "medium" | "high";
@@ -27,7 +35,10 @@ type AnnouncementResult = {
   department: string;
 };
 
-type SearchResult = IncidentResult | AnnouncementResult;
+function normalizeSeverity(value: string): "low" | "medium" | "high" {
+  if (value === "low" || value === "medium" || value === "high") return value;
+  return "medium";
+}
 
 export function useSearchPageManagement(user: User, initialShift?: Shift) {
   const [searchTerm, setSearchTerm] = useState("");
@@ -39,53 +50,73 @@ export function useSearchPageManagement(user: User, initialShift?: Shift) {
     useState<SeverityFilter>("all");
   const [showFilters, setShowFilters] = useState(false);
 
-  const searchResults = useMemo<SearchResult[]>(
-    () => [
-      {
-        id: "1",
-        type: "incident",
-        title: "機械異常音発生",
-        content:
-          "ライン2の機械から異常音が発生しています。すぐに点検が必要です。",
-        severity: "high",
+  const trimmedSearchTerm = searchTerm.trim();
+
+  const announcementsQuery = useQuery<DepartmentAnnouncement[]>({
+    queryKey: queryKeys.departmentAnnouncements.search(
+      user.departmentId ?? "",
+      trimmedSearchTerm
+    ),
+    enabled:
+      Boolean(user.departmentId) &&
+      trimmedSearchTerm.length > 0 &&
+      (searchType === "all" || searchType === "announcement"),
+    queryFn: (): Promise<DepartmentAnnouncement[]> =>
+      searchDepartmentAnnouncements(user.departmentId!, trimmedSearchTerm),
+  });
+
+  const incidentsQuery = useQuery({
+    queryKey: queryKeys.incidentReports.search(user.departmentId ?? "", trimmedSearchTerm),
+    enabled:
+      Boolean(user.departmentId) &&
+      trimmedSearchTerm.length > 0 &&
+      (searchType === "all" || searchType === "incident"),
+    queryFn: () => searchIncidentReports(user.departmentId!, trimmedSearchTerm),
+  });
+
+  const filteredResults = useMemo<(IncidentResult | AnnouncementResult)[]>(() => {
+    if (!trimmedSearchTerm) return [];
+
+    const incidentResults: IncidentResult[] = (incidentsQuery.data ?? [])
+      .filter((item) => selectedShift === "all" || item.shift === selectedShift)
+      .filter((item) => selectedSeverity === "all" || item.severity === selectedSeverity)
+      .map((item) => ({
+        id: item.id,
+        type: "incident" as const,
+        title: item.title,
+        content: item.body,
+        severity: normalizeSeverity(item.severity),
         status: "open",
-        shift: "2勤",
-        author: "作業者A",
-        createdAt: "2024-12-20 14:30",
+        shift: item.shift,
+        author: item.reporterName ?? "不明",
+        createdAt: new Date(item.createdAt).toLocaleString("ja-JP"),
         department: user.department,
-      },
-      {
-        id: "2",
-        type: "announcement",
-        title: "来週の保守点検について",
-        content:
-          "来週月曜日から水曜日まで、機械の定期保守点検を実施します。",
-        author: "保守担当 佐藤",
-        createdAt: "2024-12-20 16:00",
-        department: user.department,
-      },
-    ],
-    [user.department]
-  );
+      }));
 
-  const filteredResults = useMemo(() => {
-    return searchResults.filter((item) => {
-      const matchesSearch =
-        !searchTerm ||
-        item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.content.toLowerCase().includes(searchTerm.toLowerCase());
+    if (searchType === "incident") return incidentResults;
 
-      const matchesType = searchType === "all" || item.type === searchType;
-      const matchesShift =
-        selectedShift === "all" ||
-        ("shift" in item && item.shift === selectedShift);
-      const matchesSeverity =
-        selectedSeverity === "all" ||
-        ("severity" in item && item.severity === selectedSeverity);
+    const rows = announcementsQuery.data ?? [];
+    const announcementResults: AnnouncementResult[] = rows.map((item) => ({
+      id: item.id,
+      type: "announcement" as const,
+      title: item.title,
+      content: item.body,
+      author: item.authorName ?? "不明",
+      createdAt: item.createdAt,
+      department: user.department,
+    }));
+    if (searchType === "announcement") return announcementResults;
 
-      return matchesSearch && matchesType && matchesShift && matchesSeverity;
-    });
-  }, [searchResults, searchTerm, searchType, selectedSeverity, selectedShift]);
+    return [...incidentResults, ...announcementResults];
+  }, [
+    announcementsQuery.data,
+    incidentsQuery.data,
+    searchType,
+    selectedSeverity,
+    selectedShift,
+    trimmedSearchTerm,
+    user.department,
+  ]);
 
   const getTypeIcon = useCallback((type: string) => {
     switch (type) {
@@ -135,6 +166,21 @@ export function useSearchPageManagement(user: User, initialShift?: Shift) {
       setSelectedSeverity,
       toggleFilters,
     },
+    query: {
+      incidentsPending: incidentsQuery.isPending,
+      incidentsFetching: incidentsQuery.isFetching,
+      incidentsError: incidentsQuery.isError,
+      incidentsErrorMessage:
+        incidentsQuery.error instanceof Error ? incidentsQuery.error.message : null,
+      refetchIncidents: incidentsQuery.refetch,
+      announcementsPending: announcementsQuery.isPending,
+      announcementsFetching: announcementsQuery.isFetching,
+      announcementsError: announcementsQuery.isError,
+      announcementsErrorMessage:
+        announcementsQuery.error instanceof Error
+          ? announcementsQuery.error.message
+          : null,
+      refetchAnnouncements: announcementsQuery.refetch,
+    },
   };
 }
-

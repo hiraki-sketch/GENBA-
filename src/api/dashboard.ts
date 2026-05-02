@@ -67,6 +67,7 @@ export async function fetchDashboardSummary(params: {
       .from("department_announcements")
       .select("id, title, is_pinned, created_at")
       .eq("department_id", deptId)
+      .is("deleted_at", null)
       .order("is_pinned", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(ANNOUNCEMENT_LIMIT),

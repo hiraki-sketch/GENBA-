@@ -32,7 +32,10 @@ export function useDepartmentChatManagement(user: User) {
     onSuccess: async () => {
       setNewAnnouncement("");
       setIsComposing(false);
-      queryClient.invalidateQueries({ queryKey: listQueryKey});
+      await queryClient.invalidateQueries({ queryKey: listQueryKey });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.departmentAnnouncements.all,
+      });
     },
   });
 
@@ -45,6 +48,9 @@ export function useDepartmentChatManagement(user: User) {
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: listQueryKey });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.departmentAnnouncements.all,
+      });
       await queryClient.invalidateQueries({
         queryKey: queryKeys.dashboard.summary(user.id, user.departmentId),
       });

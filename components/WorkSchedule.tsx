@@ -6,6 +6,7 @@ import type { Shift, User } from '../types';
 import { ScheduleCalendar } from './ScheduleCalendar';
 import { ShiftSelector } from './ShiftSelector';
 import { AppHeader } from './ui/app-header';
+import { useWorkScheduleManagement } from '../src/hooks/useWorkScheduleManagement';
 
 interface WorkScheduleProps {
   user: User;
@@ -16,41 +17,43 @@ interface WorkScheduleProps {
 export function WorkSchedule({ user, selectedShift, onNavigate }: WorkScheduleProps) {
   const defaultShift: ShiftType = selectedShift;
   const [preferredShift, setPreferredShift] = useState<ShiftType>(defaultShift);
+  const { state, data, actions } = useWorkScheduleManagement(user, selectedShift);
+  const currentUserId = user.id;
 
-  const currentUserId = useMemo(() => {
-    const parsed = Number(user.id);
-    return Number.isFinite(parsed) ? parsed : 1;
-  }, [user.id]);
+  const scheduleData = useMemo<ScheduleData>(() => {
+    const year = state.currentMonth.getFullYear();
+    const month = state.currentMonth.getMonth() + 1;
 
-  const [scheduleData, setScheduleData] = useState<ScheduleData>(() => ({
-    year: new Date().getFullYear(),
-    month: new Date().getMonth() + 1,
-    employees: [
-      {
-        id: currentUserId,
-        name: user.displayName,
-        schedule: {},
-      },
-    ],
-  }));
+    const schedule: Record<number, ShiftData> = {};
+    for (const entry of data.scheduleEntries) {
+      const parts = entry.date.split("-").map((p) => Number(p));
+      if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) continue;
+      const [y, m, d] = parts;
+      if (y !== year || m !== month) continue;
+      schedule[d] = {
+        shift: entry.shift as ShiftType,
+        workplace: entry.memo?.trim() ? entry.memo.trim() : "",
+      };
+    }
 
-  const handleUpdateShift = (employeeId: number, day: number, shiftData: ShiftData) => {
-    setScheduleData((prev) => ({
-      ...prev,
-      employees: prev.employees.map((employee) => {
-        if (employee.id !== employeeId) return employee;
-        return {
-          ...employee,
-          schedule: {
-            ...employee.schedule,
-            [day]: {
-              shift: shiftData.shift || preferredShift,
-              workplace: shiftData.workplace,
-            },
-          },
-        };
-      }),
-    }));
+    return {
+      year,
+      month,
+      employees: [
+        {
+          id: user.id,
+          name: user.displayName,
+          schedule,
+        },
+      ],
+    };
+  }, [data.scheduleEntries, state.currentMonth, user.displayName, user.id]);
+
+  const handleUpdateShift = async (employeeId: string, day: number, shiftData: ShiftData) => {
+    const workDate = `${scheduleData.year}-${String(scheduleData.month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const shiftToSave = shiftData.shift || preferredShift;
+    const memo = shiftData.workplace.trim().length > 0 ? shiftData.workplace.trim() : null;
+    await actions.handleSelectDate(new Date(`${workDate}T12:00:00`), shiftToSave, memo);
   };
 
   return (

@@ -1,6 +1,6 @@
 //search-page.tsx
 import { Clock3, Megaphone, Search, Siren, User as UserIcon, Wrench } from "lucide-react-native";
-import { ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSearchPageManagement } from "../src/hooks/useSearchPageManagement";
 import { useShiftStore } from "../src/stores/useShiftStore";
@@ -25,12 +25,24 @@ export function SearchPage({
 }: SearchPageProps) {
   const currentShift = useShiftStore((state) => state.selectedShift);
   const setGlobalShift = useShiftStore((state) => state.setSelectedShift);
-  const { state, data, utils, actions } = useSearchPageManagement(
+  const { state, data, utils, actions, query } = useSearchPageManagement(
     user,
     initialSelectedShift
   );
   const { searchTerm, searchType, selectedShift, selectedSeverity, showFilters } = state;
   const { filteredResults } = data;
+  const {
+    incidentsPending,
+    incidentsFetching,
+    incidentsError,
+    incidentsErrorMessage,
+    refetchIncidents,
+    announcementsPending,
+    announcementsFetching,
+    announcementsError,
+    announcementsErrorMessage,
+    refetchAnnouncements,
+  } = query;
   const { getTypeText } = utils;
   const {
     setSearchTerm,
@@ -42,7 +54,6 @@ export function SearchPage({
 
   const renderTypeIcon = (type: "incident" | "announcement") =>
     type === "incident" ? <Siren size={18} color="#6b7280" /> : <Megaphone size={18} color="#6b7280" />;
-
 
   return (
     <SafeAreaView className="flex-1">
@@ -155,9 +166,67 @@ export function SearchPage({
         <View className="space-y-4">
           <View className="flex-row justify-between items-center">
             <Text className="text-lg font-semibold">
-              検索結果 ({filteredResults.length}件)
+              検索結果 ({data.filteredResults.length}件)
             </Text>
+            {(announcementsFetching || incidentsFetching) && searchTerm.trim().length > 0 && (
+              <ActivityIndicator size="small" />
+            )}
           </View>
+
+          {!user.departmentId && (
+            <Card>
+              <View className="py-4 px-2">
+                <Text className="text-gray-600">
+                  プロフィールに部署が設定されていないため、検索はできません。
+                </Text>
+              </View>
+            </Card>
+          )}
+
+          {user.departmentId &&
+            incidentsError &&
+            searchTerm.trim().length > 0 &&
+            (searchType === "all" || searchType === "incident") && (
+              <Card>
+                <View className="py-4 px-2">
+                  <Text className="text-red-600">
+                    {incidentsErrorMessage ?? "異常報告の検索に失敗しました"}
+                  </Text>
+                  <Pressable onPress={() => refetchIncidents()} className="mt-2 self-start">
+                    <Text className="font-medium text-primary">再試行</Text>
+                  </Pressable>
+                </View>
+              </Card>
+            )}
+
+          {user.departmentId &&
+            announcementsError &&
+            searchTerm.trim().length > 0 &&
+            (searchType === "all" || searchType === "announcement") && (
+              <Card>
+                <View className="py-4 px-2">
+                  <Text className="text-red-600">
+                    {announcementsErrorMessage ?? "検索に失敗しました"}
+                  </Text>
+                  <Pressable onPress={() => refetchAnnouncements()} className="mt-2 self-start">
+                    <Text className="font-medium text-primary">再試行</Text>
+                  </Pressable>
+                </View>
+              </Card>
+            )}
+
+          {user.departmentId &&
+            (announcementsPending || incidentsPending) &&
+            filteredResults.length === 0 &&
+            searchTerm.trim().length > 0 &&
+            (searchType === "all" || searchType === "announcement" || searchType === "incident") && (
+              <Card>
+                <View className="items-center py-8">
+                  <ActivityIndicator size="large" />
+                  <Text className="text-gray-500 mt-2">検索中…</Text>
+                </View>
+              </Card>
+            )}
 
           {filteredResults.map((item) => (
             <Card key={item.id}>
@@ -199,12 +268,26 @@ export function SearchPage({
             </Card>
           ))}
 
-          {filteredResults.length === 0 && (
+          {filteredResults.length === 0 &&
+            !announcementsPending &&
+            !incidentsPending &&
+            !announcementsError &&
+            !incidentsError &&
+            !(announcementsFetching && searchTerm.trim().length > 0) &&
+            !(incidentsFetching && searchTerm.trim().length > 0) && (
             <Card>
               <View className="items-center py-8">
                 <Search size={36} color="#9ca3af" />
                 <Text className="text-gray-500">
-                  {searchTerm ? '検索条件に一致する結果が見つかりません。' : 'キーワードを入力して検索してください。'}
+                  {!user.departmentId
+                    ? "部署を設定すると部署連絡を検索できます。"
+                    : searchTerm.trim()
+                        ? searchType === "incident"
+                          ? "検索条件に一致する異常報告が見つかりません。"
+                          : searchType === "announcement"
+                            ? "検索条件に一致する部署連絡が見つかりません。"
+                            : "検索条件に一致する結果が見つかりません。"
+                        : "キーワードを入力して検索してください。"}
                 </Text>
               </View>
             </Card>

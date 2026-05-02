@@ -21,11 +21,6 @@ type IncidentReportRow = {
   shift: number;
   department_id: string;
   reported_by: string;
-  profiles:
-    | {
-        display_name: string | null;
-      }[]
-    | null;
   created_at: string;
   updated_at: string;
   attachment_urls: string[] | null;
@@ -52,9 +47,7 @@ function toShiftNumber(v: Shift): number {
   return 1;
 }
 
-function mapRow(row: IncidentReportRow): Incident {
-  const profile = row.profiles?.[0] ?? null;
-
+function mapRow(row: IncidentReportRow, reporterNameById: Record<string, string | null>): Incident {
   return {
     id: row.id,
     title: row.title,
@@ -64,10 +57,32 @@ function mapRow(row: IncidentReportRow): Incident {
     shift: parseShift(row.shift),
     departmentId: row.department_id,
     reportedBy: row.reported_by,
-    reporterName: profile?.display_name ?? null,
+    reporterName: reporterNameById[row.reported_by] ?? "不明",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+async function buildReporterNameById(rows: IncidentReportRow[]): Promise<Record<string, string | null>> {
+  const reporterIds = Array.from(
+    new Set(rows.map((row) => row.reported_by).filter((id): id is string => Boolean(id)))
+  );
+
+  const reporterNameById: Record<string, string | null> = {};
+  if (reporterIds.length === 0) return reporterNameById;
+
+  const { data: profilesData, error: profilesError } = await supabase
+    .from("profiles")
+    .select("id, display_name")
+    .in("id", reporterIds);
+
+  if (profilesError) throw new Error(profilesError.message);
+
+  for (const profile of profilesData ?? []) {
+    reporterNameById[profile.id] = profile.display_name ?? null;
+  }
+
+  return reporterNameById;
 }
 
 function getContentTypeFromUri(uri: string): string {
@@ -95,6 +110,14 @@ function resolveContentType(photo: UploadPhotoInput): string {
   return photo.mimeType ?? getContentTypeFromUri(photo.uri);
 }
 
+function normalizeLocalUri(uri: string): string {
+  // Keep already-schemed URIs like file://, content://, ph:// as-is.
+  if (/^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(uri)) {
+    return uri;
+  }
+  return `file://${uri}`;
+}
+
 export async function fetchIncidentReports(departmentId: string | null): Promise<Incident[]> {
   if (!departmentId) return [];
 
@@ -111,10 +134,7 @@ export async function fetchIncidentReports(departmentId: string | null): Promise
       reported_by,
       created_at,
       updated_at,
-      attachment_urls,
-      profiles:reported_by (
-        display_name
-      )
+      attachment_urls
     `)
     .eq("department_id", departmentId)
     .is("deleted_at", null)
@@ -124,7 +144,54 @@ export async function fetchIncidentReports(departmentId: string | null): Promise
   if (error) throw new Error(error.message);
 
   const rows = (data as IncidentReportRow[] | null) ?? [];
-  return rows.slice(0, maxRows).map(mapRow);
+  const reporterNameById = await buildReporterNameById(rows);
+  return rows.slice(0, maxRows).map((row) => mapRow(row, reporterNameById));
+}
+
+function sanitizeIncidentSearchToken(keyword: string): string {
+  return keyword
+    .trim()
+    .replace(/[%_,]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export async function searchIncidentReports(
+  departmentId: string | null,
+  keyword: string
+): Promise<Incident[]> {
+  if (!departmentId) return [];
+
+  const token = sanitizeIncidentSearchToken(keyword);
+  if (!token) return [];
+
+  const pattern = `%${token}%`;
+
+  const { data, error } = await supabase
+    .from("incident_reports")
+    .select(`
+      id,
+      title,
+      body,
+      severity,
+      shift,
+      department_id,
+      reported_by,
+      created_at,
+      updated_at,
+      attachment_urls
+    `)
+    .eq("department_id", departmentId)
+    .is("deleted_at", null)
+    .or(`title.ilike.${pattern},body.ilike.${pattern}`)
+    .order("created_at", { ascending: false })
+    .limit(30);
+
+  if (error) throw new Error(error.message);
+
+  const rows = (data as IncidentReportRow[] | null) ?? [];
+  const reporterNameById = await buildReporterNameById(rows);
+  return rows.map((row) => mapRow(row, reporterNameById));
 }
 
 export async function insertIncidentReport(input: InsertIncidentReportInput): Promise<void> {
@@ -188,7 +255,7 @@ export async function uploadIncidentPhotos(params: {
     const extension = getFileExtensionFromContentType(contentType);
     const path = `${departmentId}/${userId}/${Date.now()}-${i}.${extension}`;
 
-    const normalizedUri = uri.startsWith("file://") ? uri : `file://${uri}`;
+    const normalizedUri = normalizeLocalUri(uri);
 
     const file = new File(normalizedUri);
     const base64 = await file.base64();
