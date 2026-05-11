@@ -1,7 +1,7 @@
 // app/profile.tsx
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { ActivityIndicator, Alert, View } from "react-native";
 import { ProfileSettings } from "../components/ProfileSettings";
 import { toJapaneseErrorMessage } from "../src/lib/errorMessages";
@@ -10,7 +10,7 @@ import { useRequireAuth } from "../src/hooks/useRequireAuth";
 export default function Profile() {
   const router = useRouter();
   const { status, user } = useRequireAuth("/login", 1500);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const isLoggingOutRef = useRef(false);
 
   const handleNavigate = useCallback(
     (page: string) => {
@@ -21,14 +21,13 @@ export default function Profile() {
   );
 
   const doLogout = useCallback(async (): Promise<boolean> => {
-    if (isLoggingOut) return false; // ✅ 多重タップ防止
+    if (isLoggingOutRef.current) return false; // ✅ 多重タップ防止
 
-    setIsLoggingOut(true);
+    isLoggingOutRef.current = true;
     try {
       // ✅ セッション確認（無いならログインへ）
       const { data } = await supabase.auth.getSession();
       if (!data.session) {
-        router.replace("/login");
         return true;
       }
 
@@ -38,19 +37,18 @@ export default function Profile() {
         return false;
       }
 
-      router.replace("/login"); // ✅ 戻るで戻れない
       return true;
     } catch (e) {
       console.error("ログアウト時の通信エラー:", e);
       Alert.alert("通信エラー", "ネットワーク接続を確認して、もう一度お試しください。");
       return false;
     } finally {
-      setIsLoggingOut(false);
+      isLoggingOutRef.current = false;
     }
-  }, [isLoggingOut, router]);
+  }, []);
 
   const handleLogout = useCallback((): Promise<boolean> => {
-    if (isLoggingOut) return Promise.resolve(false);
+    if (isLoggingOutRef.current) return Promise.resolve(false);
 
     return new Promise<boolean>((resolve) => {
       Alert.alert("ログアウト", "ログアウトしますか？", [
@@ -62,7 +60,7 @@ export default function Profile() {
         },
       ]);
     });
-  }, [doLogout, isLoggingOut]);
+  }, [doLogout]);
 
   // user オブジェクトをメモ化して、参照の変更を防ぐ（Hooksは早期リターンの前に呼ぶ必要がある）
   const memoizedUser = useMemo(
