@@ -14,17 +14,43 @@ interface WorkScheduleProps {
   onNavigate: (page: string) => void;
 }
 
-function toShiftType(shift: Shift): ShiftType {
-  if (shift === "1") return "1勤";
-  if (shift === "2") return "2勤";
-  return "3勤";
+function normalizeShiftText(value: string): string {
+  return value
+    .trim()
+    .replace(/１/g, "1")
+    .replace(/２/g, "2")
+    .replace(/３/g, "3")
+    .replace(/\s+/g, "");
 }
 
-function toShift(shiftType: ShiftType, fallback: Shift): Shift {
-  if (shiftType === "1勤") return "1";
-  if (shiftType === "2勤") return "2";
-  if (shiftType === "3勤") return "3";
-  return fallback;
+function toShiftType(shift: string): ShiftType {
+  const normalized = normalizeShiftText(shift);
+  if (normalized === "1") return "1勤";
+  if (normalized === "2") return "2勤";
+  if (normalized === "3") return "3勤";
+  if (
+    normalized === "" ||
+    normalized === "1勤" ||
+    normalized === "2勤" ||
+    normalized === "3勤" ||
+    normalized === "1A" ||
+    normalized === "3B" ||
+    normalized === "指定休" ||
+    normalized === "有給" ||
+    normalized === "休"
+  ) {
+    return normalized as ShiftType;
+  }
+  return "";
+}
+
+function toShift(shiftType: ShiftType, fallback: string): string {
+  const normalized = normalizeShiftText(shiftType);
+  if (normalized === "1勤") return "1";
+  if (normalized === "2勤") return "2";
+  if (normalized === "3勤") return "3";
+  if (normalized.length === 0) return normalizeShiftText(fallback);
+  return normalized;
 }
 
 export function WorkSchedule({ user, selectedShift, onNavigate }: WorkScheduleProps) {

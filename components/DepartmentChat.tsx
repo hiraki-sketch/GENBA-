@@ -46,7 +46,7 @@ export function DepartmentChat({ user, onNavigate }: DepartmentChatProps) {
     <View className="flex-1 bg-background">
       <AppHeader
         title="部署連絡"
-        subtitle={`${user.department} - ${currentShift}`}
+        subtitle={`${user.department} - ${currentShift}勤`}
         onBack={() => onNavigate('index')}
         rightSlot={
           <Button variant="ghost" onPress={handleToggleCompose} className="p-2 rounded-xl">

@@ -60,7 +60,7 @@ export function SearchPage({
     <ScrollView className="flex-1 bg-gray-50">
       <AppHeader
         title="検索・履歴"
-        subtitle={`${user.department} - ${currentShift}`}
+        subtitle={`${user.department} - ${currentShift}勤`}
         onBack={() => onNavigate('index')}
         rightSlot={
           <Button variant="outline" size="sm" onPress={toggleFilters}>
