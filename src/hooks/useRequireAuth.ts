@@ -12,7 +12,7 @@ type AuthStatus = "checking" | "unauthenticated" | "authenticated";
  */
 export const useRequireAuth = (
   redirectTo: string = "/login",
-  delayMs: number = 1500
+  delayMs: number = 200
 ) => {
   const { user, loading } = useAuth();
   const router = useRouter();

@@ -7,13 +7,11 @@ type ActionResult = { ok: boolean; title: string; message: string };
 
 type UseProfileSettingsManagementParams = {
   user: User;
-  onNavigate: (page: string) => void;
   onLogout: () => Promise<boolean>;
 };
 
 export function useProfileSettingsManagement({
   user,
-  onNavigate,
   onLogout,
 }: UseProfileSettingsManagementParams) {
   const { refreshUser } = useAuth();
@@ -115,24 +113,13 @@ export function useProfileSettingsManagement({
   }, [department, displayName, refreshUser, user.id]);
 
   const handleLogoutInternal = useCallback(async (): Promise<ActionResult> => {
-    if (onLogout) {
-      setLoadingLogout(true);
-      try {
-        const loggedOut = await onLogout();
-        if (loggedOut) {
-          return { ok: true, title: "ログアウト", message: "ログアウトしました。" };
-        }
-        return { ok: false, title: "キャンセル", message: "ログアウトをキャンセルしました。" };
-      } finally {
-        setLoadingLogout(false);
-      }
-    }
-
+    setLoadingLogout(true);
     try {
-      setLoadingLogout(true);
-      await supabase.auth.signOut();
-      onNavigate("login");
-      return { ok: true, title: "ログアウト", message: "ログアウトしました。" };
+      const loggedOut = await onLogout();
+      if (loggedOut) {
+        return { ok: true, title: "ログアウト", message: "ログアウトしました。" };
+      }
+      return { ok: false, title: "キャンセル", message: "ログアウトをキャンセルしました。" };
     } catch {
       return {
         ok: false,
@@ -142,7 +129,7 @@ export function useProfileSettingsManagement({
     } finally {
       setLoadingLogout(false);
     }
-  }, [onLogout, onNavigate]);
+  }, [onLogout]);
 
   return {
     state: {
