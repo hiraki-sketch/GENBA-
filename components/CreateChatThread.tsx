@@ -3,7 +3,6 @@ import { Alert, ScrollView, Switch, Text, TouchableOpacity, View } from 'react-n
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useCreateChatThreadManagement } from "../src/hooks/useCreateChatThreadManagement";
 import { User } from '../types';
-import { ResponsiveGrid } from "./layout/ResponsiveGrid";
 import { AppHeader } from "./ui/app-header";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -22,18 +21,15 @@ export function CreateChatThread({ user, onNavigate }: CreateChatThreadProps) {
     description,
     selectedShift,
     isPublic,
-    allowFileSharing,
     isSubmitting,
   } = state;
-  const { shifts, templates } = data;
+  const { templates } = data;
   const { canSubmit } = derived;
   const { getShiftText, getShiftColor } = utils;
   const {
     setTitle,
     setDescription,
-    setSelectedShift,
     setIsPublic,
-    setAllowFileSharing,
     applyTemplate,
     handleCancel,
     handleSubmit,
@@ -104,25 +100,9 @@ export function CreateChatThread({ user, onNavigate }: CreateChatThreadProps) {
 
                 <View className="space-y-2">
                   <Text className="text-sm font-medium text-foreground">対象勤務帯</Text>
-                  <ResponsiveGrid maxCols={{ sm:2, md:4, lg:4, xl:4, "2xl":4 }}>
-                    {shifts.map((shift) => (
-                      <TouchableOpacity
-                        key={shift}
-                        onPress={() => setSelectedShift(shift)}
-                        className={`px-3 py-2 rounded-xl border ${
-                          selectedShift === shift
-                            ? 'bg-primary border-primary'
-                            : 'bg-transparent border-border'
-                        }`}
-                      >
-                        <Text className={`${
-                          selectedShift === shift ? 'text-white' : 'text-foreground'
-                        } text-sm`}>
-                          {getShiftText(shift)}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ResponsiveGrid>
+                  <View className="px-3 py-2 rounded-xl border border-primary bg-primary">
+                    <Text className="text-sm text-white">全勤務帯</Text>
+                  </View>
                 </View>
 
                 <View className="space-y-3">
@@ -136,13 +116,6 @@ export function CreateChatThread({ user, onNavigate }: CreateChatThreadProps) {
                     />
                   </View>
 
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-sm text-foreground">ファイル共有を許可する</Text>
-                    <Switch
-                      value={allowFileSharing}
-                      onValueChange={setAllowFileSharing}
-                    />
-                  </View>
                 </View>
               </View>
             </Card>

@@ -12,9 +12,8 @@ export function useCreateChatThreadManagement(user: User) {
   const queryClient = useQueryClient();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [selectedShift, setSelectedShift] = useState<ShiftOrAll>("all");
+  const selectedShift: ShiftOrAll = "all";
   const [isPublic, setIsPublic] = useState(true);
-  const [allowFileSharing, setAllowFileSharing] = useState(true);
   const createThreadMutation = useMutation({
     mutationFn: createChatThread,
     onSuccess: async () => {
@@ -22,14 +21,14 @@ export function useCreateChatThreadManagement(user: User) {
     },
   });
 
-  const shifts = useMemo<ShiftOrAll[]>(() => ["all", "1", "2", "3"], []);
+  const shifts = useMemo<ShiftOrAll[]>(() => ["all"], []);
 
   const templates = useMemo(
     () => [
       {
         title: "日次引き継ぎ - {shift}",
         description: "勤務帯の引き継ぎ事項や注意事項を共有するためのチャットです。",
-        shift: "1" as ShiftOrAll,
+        shift: "all" as ShiftOrAll,
       },
       {
         title: "設備点検連絡",
@@ -88,7 +87,6 @@ export function useCreateChatThreadManagement(user: User) {
         template.shift === "all" ? "全勤務帯" : template.shift;
       setTitle(template.title.replace("{shift}", shiftText));
       setDescription(template.description);
-      setSelectedShift(template.shift);
     },
     []
   );
@@ -137,7 +135,6 @@ export function useCreateChatThreadManagement(user: User) {
         createdBy: user.displayName,
         description,
         isPublic,
-        allowFileSharing,
       });
       
       return {
@@ -154,7 +151,6 @@ export function useCreateChatThreadManagement(user: User) {
       };
     }
   }, [
-    allowFileSharing,
     description,
     isPublic,
     selectedShift,
@@ -173,7 +169,6 @@ export function useCreateChatThreadManagement(user: User) {
       description,
       selectedShift,
       isPublic,
-      allowFileSharing,
       isSubmitting: createThreadMutation.isPending,
     },
     data: {
@@ -190,9 +185,7 @@ export function useCreateChatThreadManagement(user: User) {
     actions: {
       setTitle,
       setDescription,
-      setSelectedShift,
       setIsPublic,
-      setAllowFileSharing,
       applyTemplate,
       handleCancel,
       handleSubmit,
