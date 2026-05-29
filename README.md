@@ -44,6 +44,8 @@ https://apps.apple.com/jp/app/genba/id6769666117
 - 管理者 / 作業員の権限分離
 - チャット機能
 
+## ドキュメント
 
-
+- [ドキュメント一覧](./docs/README.md)
+- [ER図](./docs/er-diagram.md)
 
