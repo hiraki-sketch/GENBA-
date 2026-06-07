@@ -6,6 +6,16 @@
 3交代勤務の現場では、引き継ぎ情報が紙やチャットで分散し、勤務帯をまたいだ情報共有に齟齬が生まれる課題がありました。  
 GENBAは、勤務帯ごとの引き継ぎ、異常報告、部署連絡をスマートフォン上で共有できるようにすることを目的に開発しました。
 
+## スクリーンショット
+
+| | | |
+| --- | --- | --- |
+| ![](./Screenshots/ios/HOME.png) | ![](./Screenshots/ios/dashboard.png) | ![](./Screenshots/ios/incidentreport.png) |
+
+| | |
+| --- | --- |
+| ![](./Screenshots/ios/chatthreads.png) | ![](./Screenshots/ios/profilesetting.png) |
+
 ## 技術選定の理由
 
 現場ではITに苦手意識のある作業員もいますが、休憩時間などにスマートフォンを使用している人は多くいます。  
