@@ -41,7 +41,16 @@ https://apps.apple.com/jp/app/genba/id6769666117
 - TanStack Query
 - Zustand
 - NativeWind
+  
+工夫した点
 
+* Supabase RLS（Row Level Security）を利用し、管理者と作業者で閲覧・操作権限を分離
+* PostgreSQLの正規化を行い、部署情報を別テーブルで管理することで部署名の表記揺れを防止
+* Supabase Storageを利用し、異常報告時の画像添付機能を実装
+* TanStack Queryを利用し、データ取得・キャッシュ管理を最適化
+* React Native / Expoを利用し、iOS向けアプリとして公開
+* App Storeへの申請から公開までを実施
+  
 ## 主な機能
 
 - ログイン機能
