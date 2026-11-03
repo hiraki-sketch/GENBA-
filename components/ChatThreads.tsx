@@ -1,4 +1,5 @@
-import { KeyboardAvoidingView, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Trash2 } from 'lucide-react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Shift, User } from '../types';
 
@@ -20,10 +21,10 @@ export function ChatThreads({ user, selectedShift, onNavigate }: ChatThreadsProp
     user,
     selectedShift,
   });
-  const { selectedThread, newMessage, isSendingMessage, errorMessage } = state;
+  const { selectedThread, newMessage, isSendingMessage, isDeletingThread, errorMessage } = state;
   const { threads, threadMessages } = data;
-  const { canSend, messageError, messageLength, messageMaxLength } = derived;
-  const { setSelectedThread, setNewMessage, handleSendMessage } = actions;
+  const { canSend, messageError, messageLength, messageMaxLength, canDeleteThread } = derived;
+  const { setSelectedThread, setNewMessage, handleSendMessage, handleDeleteThread } = actions;
 
   if (selectedThread) {
     return (
@@ -122,10 +123,12 @@ export function ChatThreads({ user, selectedShift, onNavigate }: ChatThreadsProp
       <View className="p-5">
         <ResponsiveGrid maxCols={{ sm:1, md:2, lg:2, xl:2, "2xl":2 }}>
           {threads.map((thread) => (
-            <TouchableOpacity
+            <View
               key={thread.id}
-              onPress={() => setSelectedThread(thread)}
               className="bg-card/80 rounded-2xl border border-border p-4"
+            >
+            <TouchableOpacity
+              onPress={() => setSelectedThread(thread)}
             >
               <View className="flex-row items-start space-x-3">
                 <View className="w-10 h-10 bg-blue-100 rounded-lg items-center justify-center">
@@ -157,6 +160,34 @@ export function ChatThreads({ user, selectedShift, onNavigate }: ChatThreadsProp
                 </View>
               </View>
             </TouchableOpacity>
+              {canDeleteThread && (
+                <View className="mt-3">
+                  <Button
+                    variant="outline"
+                    disabled={isDeletingThread}
+                    onPress={() => {
+                      Alert.alert("チャットの削除", "このチャットを削除します。よろしいですか？", [
+                        { text: "キャンセル", style: "cancel" },
+                        {
+                          text: "削除",
+                          style: "destructive",
+                          onPress: async () => {
+                            const res = await handleDeleteThread(thread.id);
+                            if (!res.ok) {
+                              Alert.alert("削除に失敗しました", res.message);
+                            }
+                          },
+                        },
+                      ]);
+                    }}
+                    className="border-destructive self-start"
+                  >
+                    <Trash2 size={16} color="#dc2626" />
+                    <Text className="ml-2 text-destructive">削除</Text>
+                  </Button>
+                </View>
+              )}
+            </View>
           ))}
         </ResponsiveGrid>
       </View>

@@ -1,7 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 import type { Message, Shift, Thread, User } from "../../types";
-import { getChatMessages, getChatThreads, sendChatMessage } from "../api/chatThreads";
+import {
+  deleteChatThread,
+  getChatMessages,
+  getChatThreads,
+  sendChatMessage,
+} from "../api/chatThreads";
 import {
   CHAT_MESSAGE_MAX_LENGTH,
   getLiveValidationMessage,
@@ -47,6 +52,16 @@ export function useChatThreadsManagement({
     },
   });
 
+  const deleteThreadMutation = useMutation({
+    mutationFn: deleteChatThread,
+    onSuccess: async (_data, variables) => {
+      setSelectedThread((current) =>
+        current?.id === variables.threadId ? null : current
+      );
+      await queryClient.invalidateQueries({ queryKey: queryKeys.chatThreads.list() });
+    },
+  });
+
   const threads = useMemo(() => threadsQuery.data ?? [], [threadsQuery.data]);
   const threadMessages = useMemo(
     () => messagesQuery.data ?? [],
@@ -55,6 +70,8 @@ export function useChatThreadsManagement({
   const isLoadingThreads = threadsQuery.isPending;
   const isLoadingMessages = messagesQuery.isPending || messagesQuery.isFetching;
   const isSendingMessage = sendMessageMutation.isPending;
+  const isDeletingThread = deleteThreadMutation.isPending;
+  const canDeleteThread = user.role === "admin";
   const errorMessage =
     (threadsQuery.error &&
       toJapaneseErrorMessage(threadsQuery.error, "チャットスレッドの取得に失敗しました。")) ||
@@ -99,6 +116,28 @@ export function useChatThreadsManagement({
     }
   }, [canSend, messageSubmitError, newMessage, selectedThread, sendMessageMutation, user.id]);
 
+  const handleDeleteThread = useCallback(
+    async (
+      threadId: string
+    ): Promise<{ ok: true } | { ok: false; message: string }> => {
+      if (!canDeleteThread) {
+        return { ok: false, message: "削除権限がありません" };
+      }
+
+      try {
+        await deleteThreadMutation.mutateAsync({
+          threadId,
+          role: user.role,
+        });
+        return { ok: true };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "削除に失敗しました";
+        return { ok: false, message };
+      }
+    },
+    [canDeleteThread, deleteThreadMutation, user.role]
+  );
+
   return {
     state: {
       selectedThread,
@@ -106,6 +145,7 @@ export function useChatThreadsManagement({
       isLoadingThreads,
       isLoadingMessages,
       isSendingMessage,
+      isDeletingThread,
       errorMessage,
     },
     data: {
@@ -118,11 +158,13 @@ export function useChatThreadsManagement({
       messageLength: newMessage.length,
       messageMaxLength: CHAT_MESSAGE_MAX_LENGTH,
       isSelectedShiftThreadOnly,
+      canDeleteThread,
     },
     actions: {
       setSelectedThread,
       setNewMessage,
       handleSendMessage,
+      handleDeleteThread,
     },
   };
 }

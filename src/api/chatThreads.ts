@@ -126,6 +126,7 @@ export async function getChatThreads(): Promise<Thread[]> {
       created_by,
       created_at
     `)
+    .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -151,6 +152,32 @@ export async function getChatThreads(): Promise<Thread[]> {
     };
   });
 }
+export async function deleteChatThread(params: {
+  threadId: string;
+  role?: "admin" | "manager" | "member";
+}): Promise<void> {
+  if (params.role !== "admin") {
+    throw new Error("削除権限がありません");
+  }
+
+  const { data, error } = await supabase
+    .from("chat_threads")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", params.threadId)
+    .is("deleted_at", null)
+    .select("id");
+
+  if (error) {
+    throw new Error(
+      normalizeChatErrorMessage(error, "チャットスレッドの削除に失敗しました")
+    );
+  }
+
+  if (!data || data.length === 0) {
+    throw new Error("削除対象のチャットが見つからないか、削除権限がありません");
+  }
+}
+
 export async function sendChatMessage(params: {
     threadId: string;
     userId: string;
