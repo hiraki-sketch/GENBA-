@@ -4,6 +4,7 @@ import type { Shift, User, WorkScheduleEntry } from "../../types";
 import {
   fetchMyWorkSchedules,
   upsertMyWorkSchedule,
+  upsertMyWorkSchedules,
 } from "../api/workschedules";
 
 export function useWorkScheduleManagement(user: User, selectedShift: Shift) {
@@ -20,6 +21,13 @@ export function useWorkScheduleManagement(user: User, selectedShift: Shift) {
 
   const createMutation = useMutation({
     mutationFn: upsertMyWorkSchedule,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workSchedules", user.id] });
+    },
+  });
+
+  const fillMutation = useMutation({
+    mutationFn: upsertMyWorkSchedules,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["workSchedules", user.id] });
     },
@@ -73,6 +81,21 @@ export function useWorkScheduleManagement(user: User, selectedShift: Shift) {
       });
     },
     [createMutation, formatDateForComparison, selectedShift, user.id]
+  );
+
+  const handleFillDates = useCallback(
+    async (workDates: string[], shift: string) => {
+      if (workDates.length === 0) return;
+      await fillMutation.mutateAsync(
+        workDates.map((workDate) => ({
+          userId: user.id,
+          workDate,
+          shift,
+          memo: null,
+        }))
+      );
+    },
+    [fillMutation, user.id]
   );
 
   const getShiftColor = useCallback((shift: Shift) => {
@@ -209,13 +232,14 @@ export function useWorkScheduleManagement(user: User, selectedShift: Shift) {
       previousMonth,
       nextMonth,
       handleSelectDate,
+      handleFillDates,
     },
     query: {
       isPending: schedulesQuery.isPending,
       isError: schedulesQuery.isError,
       error: schedulesQuery.error,
       refetch: schedulesQuery.refetch,
-      isSaving: createMutation.isPending,
+      isSaving: createMutation.isPending || fillMutation.isPending,
     },
   };
 }

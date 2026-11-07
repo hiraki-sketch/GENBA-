@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
 import { ImagePlus, Trash2, X } from "lucide-react-native";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -19,6 +19,7 @@ import { AppHeader } from "./ui/app-header";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
+import { ImageView } from "./ui/ImageView";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 
@@ -31,6 +32,7 @@ interface IncidentReportProps {
 export function IncidentReport({ user, selectedShift, onNavigate }: IncidentReportProps) {
   const titleInputRef = useRef<TextInput>(null);
   const bodyInputRef = useRef<TextInput>(null);
+  const [previewUri, setPreviewUri] = useState<string | null>(null);
 
   const { state, data, derived, utils, actions, query } = useIncidentReportManagement(
     user,
@@ -148,12 +150,13 @@ export function IncidentReport({ user, selectedShift, onNavigate }: IncidentRepo
                                 contentContainerStyle={{ gap: 8 }}
                               >
                                 {report.attachmentUrls.map((url) => (
-                                  <Image
-                                    key={url}
-                                    source={{ uri: url }}
-                                    style={{ width: 96, height: 96, borderRadius: 8 }}
-                                    contentFit="cover"
-                                  />
+                                  <Pressable key={url} onPress={() => setPreviewUri(url)}>
+                                    <Image
+                                      source={{ uri: url }}
+                                      style={{ width: 96, height: 96, borderRadius: 8 }}
+                                      contentFit="cover"
+                                    />
+                                  </Pressable>
                                 ))}
                               </ScrollView>
                             )}
@@ -396,6 +399,7 @@ export function IncidentReport({ user, selectedShift, onNavigate }: IncidentRepo
           </View>
         )}
       </View>
+      <ImageView uri={previewUri} onClose={() => setPreviewUri(null)} />
     </SafeAreaView>
   );
 }

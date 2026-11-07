@@ -6,7 +6,7 @@ import {
   View,
 } from 'react-native';
 import { useScheduleCalendarManagement } from '../src/hooks/useScheduleCalendarManagement';
-import type { ScheduleData, ShiftData } from '../src/hooks/useScheduleTypes';
+import type { ScheduleData, ShiftData, ShiftType } from '../src/hooks/useScheduleTypes';
 import { ScheduleModal } from './ScheduleModal';
 import { ShiftCell } from './ShiftCell';
 
@@ -14,12 +14,14 @@ interface ScheduleCalendarProps {
   scheduleData: ScheduleData;
   currentUserId: string;
   onUpdateShift: (employeeId: string, day: number, shiftData: ShiftData) => void;
+  quickShift?: ShiftType | null;
 }
 
 export function ScheduleCalendar({
   scheduleData,
   currentUserId,
   onUpdateShift,
+  quickShift,
 }: ScheduleCalendarProps) {
   const { state, data, actions } = useScheduleCalendarManagement({
     scheduleData,
@@ -51,7 +53,13 @@ export function ScheduleCalendar({
             return (
               <Pressable
                 key={day}
-                onPress={() => actions.handlePressDay(day)}
+                onPress={() => {
+                  if (quickShift && !shiftData.shift) {
+                    onUpdateShift(currentUserId, day, { shift: quickShift, workplace: '' });
+                    return;
+                  }
+                  actions.handlePressDay(day);
+                }}
                 style={[
                   styles.card,
                   isWeekend && styles.weekendCard,
@@ -77,7 +85,9 @@ export function ScheduleCalendar({
                       <Text style={styles.todayBadgeText}>今日</Text>
                     </View>
                   ) : (
-                    <Text style={styles.editText}>編集</Text>
+                    <Text style={styles.editText}>
+                      {quickShift && !shiftData.shift ? '登録' : '編集'}
+                    </Text>
                   )}
                 </View>
               </Pressable>

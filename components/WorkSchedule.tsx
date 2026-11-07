@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { ScheduleData, ShiftData, ShiftType } from '../src/hooks/useScheduleTypes';
 import { useWorkScheduleManagement } from '../src/hooks/useWorkScheduleManagement';
@@ -56,7 +56,7 @@ function toShift(shiftType: ShiftType, fallback: string): string {
 export function WorkSchedule({ user, selectedShift, onNavigate }: WorkScheduleProps) {
   const defaultShift: ShiftType = toShiftType(selectedShift);
   const [preferredShift, setPreferredShift] = useState<ShiftType>(defaultShift);
-  const { state, data, actions } = useWorkScheduleManagement(user, selectedShift);
+  const { state, data, actions, query } = useWorkScheduleManagement(user, selectedShift);
   const currentUserId = user.id;
 
   const scheduleData = useMemo<ScheduleData>(() => {
@@ -88,6 +88,45 @@ export function WorkSchedule({ user, selectedShift, onNavigate }: WorkSchedulePr
     };
   }, [data.scheduleEntries, state.currentMonth, user.displayName, user.id]);
 
+  const emptyDays = useMemo(() => {
+    const daysInMonth = new Date(scheduleData.year, scheduleData.month, 0).getDate();
+    const days: number[] = [];
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      if (!scheduleData.employees[0]?.schedule[day]?.shift) days.push(day);
+    }
+    return days;
+  }, [scheduleData]);
+
+  const handleFillEmptyDays = () => {
+    if (!preferredShift || query.isSaving) return;
+    if (emptyDays.length === 0) {
+      Alert.alert("登録済み", "未入力の日はありません。");
+      return;
+    }
+
+    Alert.alert(
+      "まとめて登録",
+      `${scheduleData.month}月の未入力 ${emptyDays.length}日を「${preferredShift}」で登録します。`,
+      [
+        { text: "キャンセル", style: "cancel" },
+        {
+          text: "登録",
+          onPress: () => {
+            const dates = emptyDays.map(
+              (day) =>
+                `${scheduleData.year}-${String(scheduleData.month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+            );
+            void actions
+              .handleFillDates(dates, toShift(preferredShift, selectedShift))
+              .catch(() => {
+                Alert.alert("登録エラー", "まとめて登録に失敗しました。");
+              });
+          },
+        },
+      ]
+    );
+  };
+
   const handleUpdateShift = async (employeeId: string, day: number, shiftData: ShiftData) => {
     const workDate = `${scheduleData.year}-${String(scheduleData.month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     const shiftToSave = toShift(shiftData.shift || preferredShift, selectedShift);
@@ -105,8 +144,20 @@ export function WorkSchedule({ user, selectedShift, onNavigate }: WorkSchedulePr
 
       <ScrollView className="flex-1" contentContainerStyle={{ padding: 16, gap: 12 }}>
         <View className="bg-white rounded-xl border border-gray-200 p-3">
-          <Text className="text-sm font-bold text-gray-700">デフォルト勤務帯</Text>
+          <Text className="text-sm font-bold text-gray-700">登録する勤務帯</Text>
+          <Text className="mt-1 mb-2 text-xs text-gray-500">
+            空いている日をタップすると、この勤務帯が入ります。入っている日は編集できます。
+          </Text>
           <ShiftSelector value={preferredShift} onSelect={(shift) => setPreferredShift(shift)} />
+          <Pressable
+            onPress={handleFillEmptyDays}
+            disabled={query.isSaving || !preferredShift}
+            className="mt-3 items-center rounded-xl bg-blue-600 px-4 py-3"
+          >
+            <Text className="font-bold text-white">
+              {query.isSaving ? "登録中..." : `未入力の${emptyDays.length}日をまとめて登録`}
+            </Text>
+          </Pressable>
         </View>
 
         <View className="rounded-xl overflow-hidden border border-gray-200 bg-white">
@@ -114,6 +165,7 @@ export function WorkSchedule({ user, selectedShift, onNavigate }: WorkSchedulePr
             scheduleData={scheduleData}
             currentUserId={currentUserId}
             onUpdateShift={handleUpdateShift}
+            quickShift={preferredShift}
           />
         </View>
       </ScrollView>
